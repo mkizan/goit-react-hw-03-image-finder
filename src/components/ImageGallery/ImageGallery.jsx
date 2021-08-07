@@ -1,61 +1,76 @@
 import React, { Component, Fragment } from 'react';
-// import axios from 'axios';
-// import { toast } from 'react-toastify';
-import Loader from 'react-loader-spinner';
+import Loader from '../Loader';
 import pixabayApi from '../../services/pixabayApi';
 import ImageGalleryItem from '../ImageGalleryItem';
 import Button from '../Button';
+import Modal from '../Modal';
 
 class ImageGallery extends Component {
   state = {
-    page: 1,
     images: [],
+    largeImage: '',
+    page: 1,
     error: '',
+    showModal: false,
+    isLoading: false,
     status: 'idle',
   };
 
   componentDidUpdate(prevProps) {
-    const { page } = this.state.page;
-    const prevSearchQuery = prevProps.searchQuery;
-    const currentSearchQuery = this.props.searchQuery;
-
-    if (prevSearchQuery !== currentSearchQuery) {
-      this.setState({ status: 'pending' });
-
-      setTimeout(() => {
-        pixabayApi
-          .fetchImages(currentSearchQuery, page)
-          .then(data => {
-            const { hits } = data;
-            this.setState({
-              images: hits,
-              status: 'resolved',
-            });
-          })
-          .catch(error => this.setState({ error, status: 'rejected' }));
-      }, 2000);
+    if (prevProps.searchQuery !== this.props.searchQuery) {
+      this.setState({
+        images: [],
+        page: 1,
+        status: 'pending',
+      });
+      this.fetchImages();
+    } else if (this.state.page !== 1) {
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: 'smooth',
+      });
     }
   }
 
+  openModal = largeImage => {
+    this.setState({ showModal: true, largeImage });
+  };
+
+  closeModal = () => {
+    this.setState({ showModal: false, largeImage: '' });
+  };
+
+  fetchImages = () => {
+    this.setState({ isLoading: true });
+
+    setTimeout(() => {
+      pixabayApi
+        .getData(this.props.searchQuery, this.state.page)
+        .then(data => {
+          this.setState(prevState => ({
+            images: [...prevState.images, ...data.hits],
+            page: prevState.page + 1,
+            status: 'resolved',
+          }));
+        })
+        .catch(error => this.setState({ error, status: 'rejected' }))
+        .finally(() => this.setState({ isLoading: false }));
+    }, 100);
+  };
+
   render() {
-    const { images, error, status } = this.state;
+    const { images, error, isLoading, largeImage, showModal, status } =
+      this.state;
     const { searchQuery } = this.props;
 
+    const shouldRenderLoadMoreButton = images.length > 0 && !isLoading;
+
     if (status === 'idle') {
-      return <p>Введите название темы картинок</p>;
+      return <p>Enter your request</p>;
     }
 
     if (status === 'pending') {
-      return (
-        <Loader
-          type="Grid"
-          color="#00BFFF"
-          height={80}
-          width={80}
-          timeout={5000}
-          className="loader"
-        />
-      );
+      return <Loader />;
     }
 
     if (status === 'rejected') {
@@ -65,12 +80,17 @@ class ImageGallery extends Component {
       return (
         <Fragment>
           <ul className="ImageGallery">
-            <ImageGalleryItem imageQuery={images} />
+            <ImageGalleryItem imageQuery={images} openModal={this.openModal} />
           </ul>
-          {images.length < 1 ? (
-            <p>{`Нет изображений по вашему запросу "${searchQuery}"`}</p>
-          ) : (
-            <Button />
+          {images.length === 0 && (
+            <p>{`No images for your request "${searchQuery}"`}</p>
+          )}
+          {showModal && (
+            <Modal closeModal={this.closeModal} largeImage={largeImage} />
+          )}
+          {isLoading && <Loader />}
+          {shouldRenderLoadMoreButton && (
+            <Button onPushButton={this.fetchImages} />
           )}
         </Fragment>
       );
