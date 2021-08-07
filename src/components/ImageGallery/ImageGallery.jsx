@@ -23,8 +23,10 @@ class ImageGallery extends Component {
         page: 1,
         status: 'pending',
       });
+
       this.fetchImages();
-    } else if (this.state.page !== 1) {
+    } else if (this.state.page > 2) {
+      console.log('this.state.page: ', this.state.page);
       window.scrollTo({
         top: document.documentElement.scrollHeight,
         behavior: 'smooth',
